@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33414.496
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UdpAsTcp", "UdpAsTcp\UdpAsTcp.csproj", "{8C9AE17F-0B23-484B-AB09-D632F7ADB84E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerTest", "ServerTest\ServerTest.csproj", "{5C08942E-1788-4175-B2A8-314BEEA35764}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientTest", "ClientTest\ClientTest.csproj", "{05EAD23E-C39F-4B26-BB9E-B35E6910F206}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8C9AE17F-0B23-484B-AB09-D632F7ADB84E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C9AE17F-0B23-484B-AB09-D632F7ADB84E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C9AE17F-0B23-484B-AB09-D632F7ADB84E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C9AE17F-0B23-484B-AB09-D632F7ADB84E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C08942E-1788-4175-B2A8-314BEEA35764}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C08942E-1788-4175-B2A8-314BEEA35764}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C08942E-1788-4175-B2A8-314BEEA35764}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C08942E-1788-4175-B2A8-314BEEA35764}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05EAD23E-C39F-4B26-BB9E-B35E6910F206}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05EAD23E-C39F-4B26-BB9E-B35E6910F206}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05EAD23E-C39F-4B26-BB9E-B35E6910F206}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05EAD23E-C39F-4B26-BB9E-B35E6910F206}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A345BC52-5E79-44B4-A01C-28A20FEA8E9D}
+	EndGlobalSection
+EndGlobal

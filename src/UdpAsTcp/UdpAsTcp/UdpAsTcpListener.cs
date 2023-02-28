@@ -13,13 +13,11 @@ namespace UdpAsTcp
      接收方收到数据包后，需要发送确认包。
      发送方收到确认包后，才从内存中移除缓存。
      包序号达到65535后，又从0开始。
-     发送和接收窗口默认为1024个包，发送窗口中第一个包确认后，窗口向后滑动一格。
+     发送和接收缓存默认为1024个包
 
-    发送缓存：byte[][]，大小为发送窗口的2倍
-    接收缓存：byte[][]，大小为接收窗口的2倍
     变量：
-    发送：窗口起始包序号，窗口结束包序号，窗口起始数组序号，窗口结束数组序号，发送包序号，发送数组序号
-    接收：窗口起始包序号，窗口结束包序号，窗口起始数组序号，窗口结束数组序号，接收包序号，接收数组序号
+    接收：接收包序号，接收数组序号
+    发送：发送包序号，发送数组序号    
      */
     public class UdpAsTcpListener
     {
@@ -28,16 +26,14 @@ namespace UdpAsTcp
         private Func<UdpClient> newListenerFunc;
         private ConcurrentQueue<UdpAsTcpClient> newClientQueue = new ConcurrentQueue<UdpAsTcpClient>();
         private ConcurrentDictionary<IPEndPoint, UdpAsTcpClient> clientDict = new ConcurrentDictionary<IPEndPoint, UdpAsTcpClient>();
-
-        public UdpAsTcpListener(int port)
-        {
-            newListenerFunc = () => new UdpClient(port);
-        }
-
+        public IPEndPoint LocalEndPoint { get; private set; }
         public UdpAsTcpListener(IPEndPoint localEP)
         {
+            LocalEndPoint = localEP;
             newListenerFunc = () => new UdpClient(localEP);
         }
+
+        public UdpAsTcpListener(int port): this(new IPEndPoint(IPAddress.Any, port)) { }
 
         public void Start()
         {
@@ -65,11 +61,12 @@ namespace UdpAsTcp
                 //如果是新连接
                 else
                 {
-                    client = new UdpAsTcpClient(this, remoteEP);
+                    client = new UdpAsTcpClient(this, listener, remoteEP);
                     client.HandleBuffer(buffer);
                     clientDict.TryAdd(remoteEP, client);
                     newClientQueue.Enqueue(client);
                 }
+                _ = beginRecv(listener, token);
             }
             catch (TaskCanceledException)
             {

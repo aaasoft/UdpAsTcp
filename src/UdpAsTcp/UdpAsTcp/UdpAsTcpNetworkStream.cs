@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -14,10 +15,6 @@ namespace UdpAsTcp
         private struct ReadBufferInfo
         {
             /// <summary>
-            /// 数组序号
-            /// </summary>
-            public int BufferIndex;
-            /// <summary>
             /// 包序号
             /// </summary>
             public int PackageIndex;
@@ -29,10 +26,6 @@ namespace UdpAsTcp
 
         private struct WriteBufferInfo
         {
-            /// <summary>
-            /// 数组序号
-            /// </summary>
-            public int BufferIndex;
             /// <summary>
             /// 包开始序号
             /// </summary>
@@ -54,56 +47,54 @@ namespace UdpAsTcp
         private const int MAX_PACKAGE_INDEX = ushort.MaxValue;
 
         private UdpAsTcpClient udpAsTcpClient;
-
-        private byte[][] readBuffer = new byte[DEFAULT_BUFFER_SIZE][];
-        private byte[][] writeBuffer = new byte[DEFAULT_BUFFER_SIZE][];
         private CancellationTokenSource cts;
+        private ConcurrentDictionary<int, byte[]> readDict = new ConcurrentDictionary<int, byte[]>();
+        private ConcurrentDictionary<int, byte[]> writeDict = new ConcurrentDictionary<int, byte[]>();
 
         //读取缓存信息
-        private ReadBufferInfo readBufferInfo=new ReadBufferInfo();
+        private ReadBufferInfo readBufferInfo = new ReadBufferInfo();
         //写入缓存信息
-        private WriteBufferInfo writeBufferInfo=new WriteBufferInfo();
+        private WriteBufferInfo writeBufferInfo = new WriteBufferInfo();
 
         public UdpAsTcpNetworkStream(UdpAsTcpClient udpAsTcpClient)
         {
             this.udpAsTcpClient = udpAsTcpClient;
             cts = new CancellationTokenSource();
-            _ = checkWriteBuffer(cts.Token);
+            //_ = checkWriteBuffer(cts.Token);
         }
 
-        private async Task checkWriteBuffer(CancellationToken token)
-        {
-            try
-            {
-                var preBufferIndex = writeBufferInfo.BufferIndex;
-                var prePackageBeginIndex = writeBufferInfo.PackageBeginIndex;
-                while (!token.IsCancellationRequested)
-                {
-                    await Task.Delay(100, token);
+        //private async Task checkWriteBuffer(CancellationToken token)
+        //{
+        //    try
+        //    {
+        //        var prePackageBeginIndex = writeBufferInfo.PackageBeginIndex;
+        //        while (!token.IsCancellationRequested)
+        //        {
+        //            await Task.Delay(100, token);
 
-                    var currentWriteBufferInfo = writeBufferInfo;
-                    if (currentWriteBufferInfo.BufferIndex == preBufferIndex
-                        && currentWriteBufferInfo.PackageBeginIndex == prePackageBeginIndex)
-                    {
-                        //再次发送第一个包
-                        var data = writeBuffer[currentWriteBufferInfo.BufferIndex];
-                        if (data != null)
-                            udpAsTcpClient.Send(data);
-                    }
-                    preBufferIndex = currentWriteBufferInfo.BufferIndex;
-                    prePackageBeginIndex = currentWriteBufferInfo.PackageBeginIndex;
-                }
-            }
-            catch (TaskCanceledException)
-            {
-                return;
-            }
-        }
+        //            var currentWriteBufferInfo = writeBufferInfo;
+        //            if (currentWriteBufferInfo.BufferIndex == preBufferIndex
+        //                && currentWriteBufferInfo.PackageBeginIndex == prePackageBeginIndex)
+        //            {
+        //                //再次发送第一个包
+        //                var data = writeBuffer[currentWriteBufferInfo.BufferIndex];
+        //                if (data != null)
+        //                    udpAsTcpClient.Send(data);
+        //            }
+        //            preBufferIndex = currentWriteBufferInfo.BufferIndex;
+        //            prePackageBeginIndex = currentWriteBufferInfo.PackageBeginIndex;
+        //        }
+        //    }
+        //    catch (TaskCanceledException)
+        //    {
+        //        return;
+        //    }
+        //}
 
         public override void Close()
         {
-            cts.Cancel();
-            cts.Cancel();
+            cts?.Cancel();
+            cts = null;
         }
 
         public override bool CanRead => true;
@@ -127,9 +118,13 @@ namespace UdpAsTcp
                         && (DateTime.Now - beginTime).TotalMilliseconds > udpAsTcpClient.ReceiveTimeout)
                         throw new TimeoutException($"Read timeout.");
                 }
-                var readBufferBuffer = readBuffer[readBufferInfo.BufferIndex];
-                if (readBufferBuffer == null)
+                byte[] readBufferBuffer;
+                if (!readDict.TryGetValue(readBufferInfo.PackageIndex, out readBufferBuffer))
                 {
+                    //如果已经读了一部分数据，则先返回，不再等待
+                    if (ret > 0)
+                        return ret;
+
                     try
                     {
                         await Task.Delay(10, cancellationToken);
@@ -148,12 +143,12 @@ namespace UdpAsTcp
                 count -= readCount;
                 ret += readCount;
                 avalibleCount = readBufferBuffer.Length - readBufferInfo.BufferBufferIndex;
-                //如果当前数组已读取完成，则读取窗口向后滑动
+                //如果当前包序号的数据已读取完成，则从字典中移除
                 if (avalibleCount <= 0)
                 {
+                    readDict.TryRemove(readBufferInfo.PackageIndex, out _);
+
                     var newReadBufferInfo = new ReadBufferInfo();
-                    newReadBufferInfo.BufferIndex = readBufferInfo.BufferIndex + 1;
-                    newReadBufferInfo.BufferIndex %= DEFAULT_BUFFER_SIZE;
                     newReadBufferInfo.PackageIndex = readBufferInfo.PackageIndex + 1;
                     newReadBufferInfo.PackageIndex %= MAX_PACKAGE_INDEX;
                     newReadBufferInfo.BufferBufferIndex = 0;
@@ -183,7 +178,7 @@ namespace UdpAsTcp
                 //数据包
                 case 0:
                     //发送确认包
-                    buffer[0] = 1;                    
+                    buffer[0] = 1;
                     udpAsTcpClient.Send(buffer, 3);
                     var currentReadBufferInfo = readBufferInfo;
                     //如果包序号不在读取窗口范围，则抛弃
@@ -200,9 +195,7 @@ namespace UdpAsTcp
                             return;
                     }
                     var payload = buffer.Skip(3).ToArray();
-                    var currentReadBufferIndex = currentReadBufferInfo.BufferIndex + packageIndex - currentReadBufferInfo.PackageIndex;
-                    currentReadBufferIndex %= DEFAULT_BUFFER_SIZE;
-                    readBuffer[currentReadBufferIndex] = payload;
+                    readDict.AddOrUpdate(packageIndex, payload, (k, v) => payload);
                     break;
                 //确认包
                 case 1:
@@ -220,13 +213,10 @@ namespace UdpAsTcp
                             && packageIndex > currentWriteBufferInfo.PackageEndIndex)
                             return;
                     }
-                    var currentBufferIndex = (packageIndex + MAX_PACKAGE_INDEX) % MAX_PACKAGE_INDEX - currentWriteBufferInfo.PackageBeginIndex + currentWriteBufferInfo.BufferIndex;
-                    writeBuffer[currentBufferIndex] = null;
+                    writeDict.TryRemove(packageIndex, out _);
                     //如果可以移动
-                    while (writeBuffer[currentWriteBufferInfo.BufferIndex] == null)
+                    while (!writeDict.ContainsKey(currentWriteBufferInfo.PackageBeginIndex))
                     {
-                        currentWriteBufferInfo.BufferIndex++;
-                        currentWriteBufferInfo.BufferIndex %= DEFAULT_BUFFER_SIZE;
                         currentWriteBufferInfo.PackageBeginIndex++;
                         currentWriteBufferInfo.PackageBeginIndex %= MAX_PACKAGE_INDEX;
                         writeBufferInfo = currentWriteBufferInfo;
@@ -251,7 +241,8 @@ namespace UdpAsTcp
             for (var i = 0; i < count; i += MAX_PAYLOAD_PER_PACKAGE)
             {
                 var data = new byte[3];
-                var tmpBytes = BitConverter.GetBytes(Convert.ToUInt16(currentWriteBufferInfo.PackageEndIndex));
+                var currentPackageIndex = currentWriteBufferInfo.PackageEndIndex;
+                var tmpBytes = BitConverter.GetBytes(Convert.ToUInt16(currentPackageIndex));
                 data[0] = 0;
                 data[1] = tmpBytes[0];
                 data[2] = tmpBytes[1];
@@ -272,8 +263,7 @@ namespace UdpAsTcp
                     if (udpAsTcpClient.SendTimeout > 0
                         && (DateTime.Now - beginTime).TotalMilliseconds > udpAsTcpClient.SendTimeout)
                         throw new TimeoutException("Write timeout.");
-                    var currentBufferIndex = (currentWriteBufferInfo.PackageEndIndex + MAX_PACKAGE_INDEX) % MAX_PACKAGE_INDEX - currentWriteBufferInfo.PackageBeginIndex + currentWriteBufferInfo.BufferIndex;
-                    if (currentBufferIndex == currentWriteBufferInfo.BufferIndex)
+                    if (writeDict.Count >= DEFAULT_BUFFER_SIZE)
                     {
                         try
                         {
@@ -285,12 +275,34 @@ namespace UdpAsTcp
                             return;
                         }
                     }
-                    currentBufferIndex %= DEFAULT_BUFFER_SIZE;
-                    writeBuffer[currentBufferIndex] = data;
+                    writeDict.AddOrUpdate(currentPackageIndex, data, (k, v) => data);
                     currentWriteBufferInfo.PackageEndIndex++;
-                    currentWriteBufferInfo.PackageEndIndex = currentWriteBufferInfo.PackageEndIndex % MAX_PACKAGE_INDEX;
+                    currentWriteBufferInfo.PackageEndIndex %= MAX_PACKAGE_INDEX;
                     writeBufferInfo = currentWriteBufferInfo;
                     udpAsTcpClient.Send(data);
+                    _ = Task.Delay(100, cancellationToken).ContinueWith(async t =>
+                    {
+                        if (t.IsCanceled)
+                            return;
+                        try
+                        {
+                            //重试3次
+                            for (var i = 0; i < 3; i++)
+                            {
+                                byte[] data;
+                                if (!writeDict.TryGetValue(currentPackageIndex, out data))
+                                    return;
+                                //再次发送
+                                udpAsTcpClient.Send(data);
+                                await Task.Delay(100, cancellationToken);
+                            }
+                        }
+                        catch (TaskCanceledException)
+                        {
+                            return;
+                        }
+                        catch { }
+                    });
                     break;
                 }
             }

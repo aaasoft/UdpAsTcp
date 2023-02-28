@@ -7,13 +7,14 @@ Console.WriteLine("Connecting...");
 client.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 3001));
 Console.WriteLine("Connected.");
 var stream = client.GetStream();
+var writer = new StreamWriter(stream);
 Task.Run(() =>
 {
     while (true)
     {
-        var line = DateTime.Now.ToString() + Environment.NewLine;
-        stream.Write(Encoding.Default.GetBytes(line));
-        Console.WriteLine("Send:" + line);
+        var line = DateTime.Now.ToString();
+        writer.WriteLine(line);
+        writer.Flush();
         Thread.Sleep(1000);
     }
 });
@@ -23,7 +24,7 @@ Task.Run(() =>
     while (true)
     {
         var line = reader.ReadLine();
-        Console.WriteLine("Recv:" + line);
+        Console.WriteLine($"[{client.RemoteEndPoint}]: {line}");
     }
 });
 Console.ReadLine();

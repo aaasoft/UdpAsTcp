@@ -130,5 +130,18 @@ namespace UdpAsTcp
                 networkStream = new UdpAsTcpNetworkStream(this);
             return networkStream;
         }
+
+        internal void Send(byte[] buffer)
+        {
+            Send(buffer, buffer.Length);
+        }
+
+        internal void Send(byte[] buffer, int count)
+        {
+            if (Client.Client.RemoteEndPoint == null)
+                Client.Send(buffer, count, RemoteEndPoint);
+            else
+                Client.Send(buffer, count);
+        }
     }
 }

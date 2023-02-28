@@ -60,9 +60,9 @@ namespace UdpAsTcp
         private CancellationTokenSource cts;
 
         //读取缓存信息
-        private ReadBufferInfo readBufferInfo;
+        private ReadBufferInfo readBufferInfo=new ReadBufferInfo();
         //写入缓存信息
-        private WriteBufferInfo writeBufferInfo;
+        private WriteBufferInfo writeBufferInfo=new WriteBufferInfo();
 
         public UdpAsTcpNetworkStream(UdpAsTcpClient udpAsTcpClient)
         {
@@ -88,7 +88,7 @@ namespace UdpAsTcp
                         //再次发送第一个包
                         var data = writeBuffer[currentWriteBufferInfo.BufferIndex];
                         if (data != null)
-                            udpAsTcpClient.Client.Send(data, udpAsTcpClient.RemoteEndPoint);
+                            udpAsTcpClient.Send(data);
                     }
                     preBufferIndex = currentWriteBufferInfo.BufferIndex;
                     prePackageBeginIndex = currentWriteBufferInfo.PackageBeginIndex;
@@ -183,8 +183,8 @@ namespace UdpAsTcp
                 //数据包
                 case 0:
                     //发送确认包
-                    buffer[0] = 1;
-                    udpAsTcpClient.Client.Send(buffer, 3, udpAsTcpClient.RemoteEndPoint);
+                    buffer[0] = 1;                    
+                    udpAsTcpClient.Send(buffer, 3);
                     var currentReadBufferInfo = readBufferInfo;
                     //如果包序号不在读取窗口范围，则抛弃
                     if (currentReadBufferInfo.PackageIndex + DEFAULT_BUFFER_SIZE < MAX_PACKAGE_INDEX)
@@ -290,7 +290,7 @@ namespace UdpAsTcp
                     currentWriteBufferInfo.PackageEndIndex++;
                     currentWriteBufferInfo.PackageEndIndex = currentWriteBufferInfo.PackageEndIndex % MAX_PACKAGE_INDEX;
                     writeBufferInfo = currentWriteBufferInfo;
-                    udpAsTcpClient.Client.Send(data, udpAsTcpClient.RemoteEndPoint);
+                    udpAsTcpClient.Send(data);
                     break;
                 }
             }

@@ -107,8 +107,9 @@ namespace UdpAsTcp
             }
             catch (Exception ex)
             {
-                OnError(ex);
-                throw;
+                var connectionException = new IOException("Syn and ACK failed.", ex);
+                OnError(connectionException);
+                throw connectionException;
             }
             finally
             {
@@ -137,8 +138,9 @@ namespace UdpAsTcp
             }
             catch (Exception ex)
             {
-                OnError(ex);
-                throw;
+                var connectionException = new IOException("Connect failed.", ex);
+                OnError(connectionException);
+                throw connectionException;
             }
             finally
             {

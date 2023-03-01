@@ -68,7 +68,13 @@ namespace UdpAsTcp
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            return ReadAsync(buffer, offset, count, CancellationToken.None).Result;
+            var currentCts = cts;
+            var token = currentCts == null ? CancellationToken.None : currentCts.Token;
+            var task = ReadAsync(buffer, offset, count, token);
+            if (udpAsTcpClient.ReceiveTimeout <= 0
+                || task.Wait(udpAsTcpClient.ReceiveTimeout))
+                return task.Result;
+            throw new TimeoutException("Read timeout.");
         }
 
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)

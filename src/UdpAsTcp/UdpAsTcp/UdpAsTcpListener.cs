@@ -61,10 +61,21 @@ namespace UdpAsTcp
                 //如果是新连接
                 else
                 {
-                    client = new UdpAsTcpClient(this, listener, remoteEP);
-                    client.HandleBuffer(buffer);
-                    clientDict.TryAdd(remoteEP, client);
-                    newClientQueue.Enqueue(client);
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            client = new UdpAsTcpClient(this, listener, remoteEP);
+                            client.HandleBuffer(buffer);
+                            clientDict.TryAdd(remoteEP, client);
+                            client.serverSynAndAck();
+                            newClientQueue.Enqueue(client);
+                        }
+                        catch
+                        {
+                            clientDict.TryRemove(remoteEP, out _);
+                        }
+                    });
                 }
                 _ = beginRecv(listener, token);
             }

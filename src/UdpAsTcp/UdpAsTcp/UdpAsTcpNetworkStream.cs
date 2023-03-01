@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using UdpAsTcp.Utils;
 
 namespace UdpAsTcp
 {
@@ -60,36 +61,7 @@ namespace UdpAsTcp
         {
             this.udpAsTcpClient = udpAsTcpClient;
             cts = new CancellationTokenSource();
-            //_ = checkWriteBuffer(cts.Token);
         }
-
-        //private async Task checkWriteBuffer(CancellationToken token)
-        //{
-        //    try
-        //    {
-        //        var prePackageBeginIndex = writeBufferInfo.PackageBeginIndex;
-        //        while (!token.IsCancellationRequested)
-        //        {
-        //            await Task.Delay(100, token);
-
-        //            var currentWriteBufferInfo = writeBufferInfo;
-        //            if (currentWriteBufferInfo.BufferIndex == preBufferIndex
-        //                && currentWriteBufferInfo.PackageBeginIndex == prePackageBeginIndex)
-        //            {
-        //                //再次发送第一个包
-        //                var data = writeBuffer[currentWriteBufferInfo.BufferIndex];
-        //                if (data != null)
-        //                    udpAsTcpClient.Send(data);
-        //            }
-        //            preBufferIndex = currentWriteBufferInfo.BufferIndex;
-        //            prePackageBeginIndex = currentWriteBufferInfo.PackageBeginIndex;
-        //        }
-        //    }
-        //    catch (TaskCanceledException)
-        //    {
-        //        return;
-        //    }
-        //}
 
         public override void Close()
         {
@@ -165,20 +137,16 @@ namespace UdpAsTcp
             if (buffer.Length < 3)
                 return;
             var packageType = (UdpAsTcpPackageType)buffer[0];
-            //如果当前机器是小端字节
-            if (BitConverter.IsLittleEndian)
-            {
-                var tmpByte = buffer[1];
-                buffer[1] = buffer[2];
-                buffer[2] = tmpByte;
-            }
-            var packageIndex = BitConverter.ToUInt16(buffer, 1);
+            var packageIndex = ByteUtils.B2US_BE(buffer, 1);
+            Console.WriteLine($"[DEBUG]Recv package.Index: {packageIndex}, Type: {packageType}");
+            if (packageIndex > 10)
+                Console.WriteLine();
             switch (packageType)
             {
                 //数据包
                 case UdpAsTcpPackageType.DATA:
                     //发送确认包
-                    buffer[0] = 1;
+                    buffer[0] = (byte)UdpAsTcpPackageType.DATA_ACK;
                     udpAsTcpClient.Send(buffer, 3);
                     var currentReadBufferInfo = readBufferInfo;
                     //如果包序号不在读取窗口范围，则抛弃
@@ -259,8 +227,10 @@ namespace UdpAsTcp
                 }
                 var takeCount = Math.Min(waitToWriteCount, MAX_PAYLOAD_PER_PACKAGE);
                 data = data
-                    .Concat(buffer.Skip(offset + i)
-                    .Take(takeCount))
+                    .Concat(
+                        buffer.Skip(offset + i)
+                            .Take(takeCount)
+                    )
                     .ToArray();
                 waitToWriteCount -= takeCount;
                 while (true)
@@ -285,22 +255,25 @@ namespace UdpAsTcp
                     currentWriteBufferInfo.PackageEndIndex %= MAX_PACKAGE_INDEX;
                     writeBufferInfo = currentWriteBufferInfo;
                     udpAsTcpClient.Send(data);
-                    _ = Task.Delay(100, cancellationToken).ContinueWith(async t =>
+                    _ = Task.Delay(udpAsTcpClient.DataAckRetryInterval, cancellationToken).ContinueWith(async t =>
                     {
                         if (t.IsCanceled)
                             return;
                         try
                         {
                             //重试3次
-                            for (var i = 0; i < 3; i++)
+                            for (var i = 0; i < udpAsTcpClient.DataAckRetryTimes; i++)
                             {
                                 byte[] data;
                                 if (!writeDict.TryGetValue(currentPackageIndex, out data))
                                     return;
                                 //再次发送
                                 udpAsTcpClient.Send(data);
-                                await Task.Delay(100, cancellationToken);
+                                await Task.Delay(udpAsTcpClient.DataAckRetryInterval, cancellationToken);
                             }
+                            //等待接收确认包超时，触发错误
+                            udpAsTcpClient.OnError(new IOException($"Wait for package[{currentPackageIndex}] ACK timeout."));
+                            
                         }
                         catch (TaskCanceledException)
                         {

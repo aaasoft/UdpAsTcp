@@ -131,9 +131,6 @@ namespace UdpAsTcp
                 return;
             var packageType = (UdpAsTcpPackageType)buffer[0];
             var packageIndex = ByteUtils.B2US_BE(buffer, 1);
-            Console.WriteLine($"[DEBUG]Recv package.Index: {packageIndex}, Type: {packageType}, Length: {buffer.Length}");
-            if (packageIndex > 10)
-                Console.WriteLine();
             switch (packageType)
             {
                 //数据包

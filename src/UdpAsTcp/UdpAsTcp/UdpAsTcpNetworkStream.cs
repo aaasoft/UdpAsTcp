@@ -1,12 +1,4 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Concurrent;
 using UdpAsTcp.Utils;
 
 namespace UdpAsTcp
@@ -37,6 +29,7 @@ namespace UdpAsTcp
             public int PackageEndIndex;
         }
 
+        private const int PACKAGE_HEAD_SIZE = 3;
         /// <summary>
         /// 每个数据包最大负载
         /// </summary>
@@ -138,7 +131,7 @@ namespace UdpAsTcp
                 return;
             var packageType = (UdpAsTcpPackageType)buffer[0];
             var packageIndex = ByteUtils.B2US_BE(buffer, 1);
-            Console.WriteLine($"[DEBUG]Recv package.Index: {packageIndex}, Type: {packageType}");
+            Console.WriteLine($"[DEBUG]Recv package.Index: {packageIndex}, Type: {packageType}, Length: {buffer.Length}");
             if (packageIndex > 10)
                 Console.WriteLine();
             switch (packageType)
@@ -147,7 +140,7 @@ namespace UdpAsTcp
                 case UdpAsTcpPackageType.DATA:
                     //发送确认包
                     buffer[0] = (byte)UdpAsTcpPackageType.DATA_ACK;
-                    udpAsTcpClient.Send(buffer, 3);
+                    udpAsTcpClient.Send(buffer, PACKAGE_HEAD_SIZE);
                     var currentReadBufferInfo = readBufferInfo;
                     //如果包序号不在读取窗口范围，则抛弃
                     if (currentReadBufferInfo.PackageIndex + DEFAULT_BUFFER_SIZE < MAX_PACKAGE_INDEX)
@@ -162,7 +155,7 @@ namespace UdpAsTcp
                             && packageIndex > currentReadBufferInfo.PackageIndex + DEFAULT_BUFFER_SIZE)
                             return;
                     }
-                    var payload = buffer.Skip(3).ToArray();
+                    var payload = buffer.Skip(PACKAGE_HEAD_SIZE).ToArray();
                     readDict.AddOrUpdate(packageIndex, payload, (k, v) => payload);
                     break;
                 //确认包
@@ -213,25 +206,16 @@ namespace UdpAsTcp
             var waitToWriteCount = count;
             for (var i = 0; i < count; i += MAX_PAYLOAD_PER_PACKAGE)
             {
-                var data = new byte[3];
-                var currentPackageIndex = currentWriteBufferInfo.PackageEndIndex;
-                var tmpBytes = BitConverter.GetBytes(Convert.ToUInt16(currentPackageIndex));
-                data[0] = (byte)UdpAsTcpPackageType.DATA;
-                data[1] = tmpBytes[0];
-                data[2] = tmpBytes[1];
-                if (BitConverter.IsLittleEndian)
-                {
-                    var tmpByte = data[1];
-                    data[1] = data[2];
-                    data[2] = tmpByte;
-                }
                 var takeCount = Math.Min(waitToWriteCount, MAX_PAYLOAD_PER_PACKAGE);
-                data = data
-                    .Concat(
-                        buffer.Skip(offset + i)
-                            .Take(takeCount)
-                    )
-                    .ToArray();
+                var data = new byte[PACKAGE_HEAD_SIZE + takeCount];
+                var currentPackageIndex = currentWriteBufferInfo.PackageEndIndex;
+                //包类型
+                data[0] = (byte)UdpAsTcpPackageType.DATA;
+                //包序号
+                ByteUtils.US2B_BE(Convert.ToUInt16(currentPackageIndex)).CopyTo(data, 1);
+                //包负载
+                Buffer.BlockCopy(buffer, offset + i, data, PACKAGE_HEAD_SIZE, takeCount);
+
                 waitToWriteCount -= takeCount;
                 while (true)
                 {
@@ -273,7 +257,7 @@ namespace UdpAsTcp
                             }
                             //等待接收确认包超时，触发错误
                             udpAsTcpClient.OnError(new IOException($"Wait for package[{currentPackageIndex}] ACK timeout."));
-                            
+
                         }
                         catch (TaskCanceledException)
                         {

@@ -13,15 +13,7 @@ namespace UdpAsTcp
 
         public UdpClient Client { get; private set; }
         public bool Connected { get; private set; } = false;
-        public IPEndPoint LocalEndPoint
-        {
-            get
-            {
-                if (listener == null)
-                    return (IPEndPoint)Client.Client.LocalEndPoint;
-                return listener.LocalEndPoint;
-            }
-        }
+        public IPEndPoint LocalEndPoint { get; private set; }
         public IPEndPoint RemoteEndPoint { get; private set; }
         internal Exception LastException { get; private set; }
         private bool isWaitingForSynAndAck = true;
@@ -38,27 +30,27 @@ namespace UdpAsTcp
             this.listener = listener;
             Client = client;
             RemoteEndPoint = remoteEP;
+            LocalEndPoint = (IPEndPoint)Client.Client.LocalEndPoint;
         }
 
-        public UdpAsTcpClient()
-        {
-            Client = new UdpClient();
-        }
-
-        public UdpAsTcpClient(int port)
-        {
-            Client = new UdpClient(port);
-        }
+        public UdpAsTcpClient() { }
+        public UdpAsTcpClient(int port) : this(new IPEndPoint(IPAddress.Any, port)) { }
 
         public UdpAsTcpClient(IPEndPoint localEP)
         {
-            Client = new UdpClient(localEP);
+            LocalEndPoint = localEP;
         }
 
         public void Connect(IPEndPoint remoteEP)
         {
             RemoteEndPoint = remoteEP;
+            if (LocalEndPoint == null)
+                Client = new UdpClient(remoteEP.AddressFamily);
+            else
+                Client = new UdpClient(LocalEndPoint);
             Client.Connect(remoteEP);
+            if (LocalEndPoint == null)
+                LocalEndPoint = (IPEndPoint)Client.Client.LocalEndPoint;
             cts?.Cancel();
             cts = new CancellationTokenSource();
             _ = beginRecv(cts.Token);
@@ -155,7 +147,10 @@ namespace UdpAsTcp
 
         public void Connect(string hostname, int port)
         {
-            Connect(Dns.GetHostAddresses(hostname).First(), port);
+            IPAddress ipAddress = null;
+            if (!IPAddress.TryParse(hostname, out ipAddress))
+                ipAddress = Dns.GetHostAddresses(hostname).First();
+            Connect(ipAddress, port);
         }
 
         public void Close()

@@ -215,11 +215,16 @@ namespace UdpAsTcp
                     }
                     writeDict.TryRemove(packageIndex, out _);
                     //如果可以移动
-                    while (!writeDict.ContainsKey(currentWriteBufferInfo.PackageBeginIndex))
+                    while (true)
                     {
+                        if (writeDict.ContainsKey(currentWriteBufferInfo.PackageBeginIndex))
+                            break;
+
                         currentWriteBufferInfo.PackageBeginIndex++;
                         currentWriteBufferInfo.PackageBeginIndex %= MAX_PACKAGE_INDEX;
                         writeBufferInfo = currentWriteBufferInfo;
+                        if (currentWriteBufferInfo.PackageBeginIndex == currentWriteBufferInfo.PackageEndIndex)
+                            break;
                     }
                     break;
                 //未知包

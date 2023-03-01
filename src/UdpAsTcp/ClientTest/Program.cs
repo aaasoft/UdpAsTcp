@@ -2,6 +2,7 @@
 using System.Text;
 using UdpAsTcp;
 
+Thread.Sleep(2000);
 var client = new UdpAsTcpClient();
 Console.WriteLine("Connecting...");
 client.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 3001));

@@ -102,7 +102,7 @@ namespace UdpAsTcp
                 if (token.IsCancellationRequested)
                     return;
                 var ret = await Client.ReceiveAsync(token);
-                if (ret.RemoteEndPoint == RemoteEndPoint)
+                if (ret.RemoteEndPoint.Equals(RemoteEndPoint))
                     HandleBuffer(ret.Buffer);
                 _ = beginRecv(token);
             }

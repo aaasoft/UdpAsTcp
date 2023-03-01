@@ -32,8 +32,9 @@ namespace UdpAsTcp
             LocalEndPoint = localEP;
             newListenerFunc = () => new UdpClient(localEP);
         }
+        public UdpAsTcpListener(IPAddress ipAddress, int port) : this(new IPEndPoint(ipAddress, port)) { }
 
-        public UdpAsTcpListener(int port): this(new IPEndPoint(IPAddress.Any, port)) { }
+        public UdpAsTcpListener(int port) : this(IPAddress.Any, port) { }
 
         public void Start()
         {

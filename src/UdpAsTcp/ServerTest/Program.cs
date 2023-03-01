@@ -2,7 +2,7 @@
 using System.Text;
 using UdpAsTcp;
 
-var listener = new UdpAsTcpListener(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 3001));
+var listener = new UdpAsTcpListener(3001);
 listener.Start();
 Console.WriteLine($"Listening...");
 

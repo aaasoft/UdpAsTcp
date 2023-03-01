@@ -164,7 +164,7 @@ namespace UdpAsTcp
         {
             if (buffer.Length < 3)
                 return;
-            var packageType = buffer[0];
+            var packageType = (UdpAsTcpPackageType)buffer[0];
             //如果当前机器是小端字节
             if (BitConverter.IsLittleEndian)
             {
@@ -176,7 +176,7 @@ namespace UdpAsTcp
             switch (packageType)
             {
                 //数据包
-                case 0:
+                case UdpAsTcpPackageType.DATA:
                     //发送确认包
                     buffer[0] = 1;
                     udpAsTcpClient.Send(buffer, 3);
@@ -198,7 +198,7 @@ namespace UdpAsTcp
                     readDict.AddOrUpdate(packageIndex, payload, (k, v) => payload);
                     break;
                 //确认包
-                case 1:
+                case UdpAsTcpPackageType.DATA_ACK:
                     var currentWriteBufferInfo = writeBufferInfo;
                     //如果包序号不在发送窗口范围，则抛弃
                     if (currentWriteBufferInfo.PackageBeginIndex < currentWriteBufferInfo.PackageEndIndex)
@@ -248,7 +248,7 @@ namespace UdpAsTcp
                 var data = new byte[3];
                 var currentPackageIndex = currentWriteBufferInfo.PackageEndIndex;
                 var tmpBytes = BitConverter.GetBytes(Convert.ToUInt16(currentPackageIndex));
-                data[0] = 0;
+                data[0] = (byte)UdpAsTcpPackageType.DATA;
                 data[1] = tmpBytes[0];
                 data[2] = tmpBytes[1];
                 if (BitConverter.IsLittleEndian)

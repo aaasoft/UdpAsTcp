@@ -1,10 +1,10 @@
-# UdpAsTcp [![NuGet Version](http://img.shields.io/nuget/v/UdpAsTcp.svg?style=flat)](https://www.nuget.org/packages/UdpAsTcp/)
+ï»¿# UdpAsTcp [![NuGet Version](http://img.shields.io/nuget/v/UdpAsTcp.svg?style=flat)](https://www.nuget.org/packages/UdpAsTcp/)
 * Use UDP like TCP.
-* ÏñÊ¹ÓÃTCPÒ»ÑùÊ¹ÓÃUDP
+* åƒä½¿ç”¨TCPä¸€æ ·ä½¿ç”¨UDP
 
-## How to Use - Ê¹ÓÃ·½·¨
+## How to Use - ä½¿ç”¨æ–¹æ³•
 
-### Server - ·şÎñ¶Ë
+### Server - æœåŠ¡ç«¯
 ```csharp
 var listener = new UdpAsTcpListener(3001);
 listener.Start();
@@ -38,7 +38,7 @@ while (true)
 }
 
 ```
-### Client - ¿Í»§¶Ë
+### Client - å®¢æˆ·ç«¯
 ```csharp
 var client = new UdpAsTcpClient();
 Console.WriteLine("Connecting...");
@@ -69,10 +69,10 @@ Console.ReadLine();
 
 ```
 
-## Main Types - Ö÷ÒªÀàĞÍ
+## Main Types - ä¸»è¦ç±»å‹
 
 The main types provided by this library are:
-´Ë³ÌĞò¿âÌá¹©ÁËÕâĞ©Ö÷ÒªÀàĞÍ:
+æ­¤ç¨‹åºåº“æä¾›äº†è¿™äº›ä¸»è¦ç±»å‹:
 
 * `UdpAsTcpListener` (like `TcpListener`)
 * `UdpAsTcpClient` (like `TcpClient`)

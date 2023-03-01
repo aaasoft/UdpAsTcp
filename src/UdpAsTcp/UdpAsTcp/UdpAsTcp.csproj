@@ -5,12 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>Use udp like tcp.</Title>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Authors>scbeta</Authors>
     <PackageProjectUrl>https://github.com/aaasoft/UdpAsTcp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/aaasoft/UdpAsTcp</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>logo.png</PackageIcon>
+    <Description>Use udp like tcp.</Description>
+    <PackageTags>UDP;TCP;Network</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

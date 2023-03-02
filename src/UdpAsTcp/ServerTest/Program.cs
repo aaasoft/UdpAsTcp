@@ -3,6 +3,8 @@ using System.Text;
 using UdpAsTcp;
 
 var listener = new UdpAsTcpListener(3001);
+//if you want to listen IPv6 udp port.Use IPAddress.IPv6Any or other IPv6 address.
+//var listener = new UdpAsTcpListener(IPAddress.IPv6Any, 3001);
 listener.Start();
 Console.WriteLine($"Listening...");
 

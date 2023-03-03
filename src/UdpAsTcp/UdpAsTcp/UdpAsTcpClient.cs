@@ -13,6 +13,7 @@ namespace UdpAsTcp
 
         public UdpClient Client { get; private set; }
         public bool Connected { get; private set; } = false;
+        public bool Debug { get; set; }
         public IPEndPoint LocalEndPoint { get; private set; }
         public IPEndPoint RemoteEndPoint { get; private set; }
         internal Exception LastException { get; private set; }
@@ -62,8 +63,8 @@ namespace UdpAsTcp
             while (true)
             {
                 var ret = stream.Read(buffer);
-                if (ret != 3)
-                    throw new IOException("Data length error.");
+                if (ret < 3)
+                    throw new IOException($"Data length[{ret}] error.");
                 var packageType = (UdpAsTcpPackageType)buffer[0];
                 if (packageType != type)
                     throw new IOException("Package type error.");
@@ -71,7 +72,7 @@ namespace UdpAsTcp
             }
         }
 
-        private void writeSyncOrAck(Stream stream, byte[] buffer, UdpAsTcpPackageType type,ushort number)
+        private void writeSyncOrAck(Stream stream, byte[] buffer, UdpAsTcpPackageType type, ushort number)
         {
             buffer[0] = (byte)type;
             ByteUtils.US2B_BE(number).CopyTo(buffer, 1);
@@ -173,7 +174,8 @@ namespace UdpAsTcp
 
         internal void HandleBuffer(byte[] buffer)
         {
-            GetStream().HandleBuffer(buffer);
+            if (isWaitingForSynAndAck || Connected)
+                GetStream().HandleBuffer(buffer);
         }
 
         private async Task beginRecv(CancellationToken token)
@@ -201,11 +203,12 @@ namespace UdpAsTcp
         {
             LastException = ex;
             Connected = false;
+            isWaitingForSynAndAck = false;
             networkStream?.Close();
             networkStream?.Dispose();
             networkStream = null;
             if (listener != null)
-                listener.OnClientDisconnected(this);
+                listener.OnClientDisconnected(this, ex);
             else
                 Client.Close();
         }
@@ -226,7 +229,12 @@ namespace UdpAsTcp
         {
             if (!isWaitingForSynAndAck && !Connected)
                 throw new IOException("Not connected", LastException);
-
+            if (Debug)
+            {
+                var packageType = (UdpAsTcpPackageType)buffer[0];
+                var packageIndex = ByteUtils.B2US_BE(buffer, 1);
+                Console.WriteLine($"[SEND][{RemoteEndPoint}] Index: {packageIndex}, Type: {packageType}, Length: {count}");
+            }
             if (Client.Client.RemoteEndPoint == null)
                 Client.Send(buffer, count, RemoteEndPoint);
             else

@@ -103,7 +103,7 @@ namespace UdpAsTcp
                     }
                     catch (TaskCanceledException)
                     {
-                        return ret;
+                        return -1;
                     }
                 }
                 var avalibleCount = readBufferBuffer.Length - readBufferInfo.BufferBufferIndex;
@@ -137,6 +137,10 @@ namespace UdpAsTcp
                 return;
             var packageType = (UdpAsTcpPackageType)buffer[0];
             var packageIndex = ByteUtils.B2US_BE(buffer, 1);
+            if (udpAsTcpClient.Debug)
+            {
+                Console.WriteLine($"[RECV][{udpAsTcpClient.RemoteEndPoint}] Index: {packageIndex}, Type: {packageType}, Length: {buffer.Length}");
+            }
             switch (packageType)
             {
                 //数据包

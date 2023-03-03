@@ -27,6 +27,7 @@ namespace UdpAsTcp
         private ConcurrentQueue<UdpAsTcpClient> newClientQueue = new ConcurrentQueue<UdpAsTcpClient>();
         private ConcurrentDictionary<IPEndPoint, UdpAsTcpClient> clientDict = new ConcurrentDictionary<IPEndPoint, UdpAsTcpClient>();
         public IPEndPoint LocalEndPoint { get; private set; }
+        public bool Debug { get; set; }
         public UdpAsTcpListener(IPEndPoint localEP)
         {
             LocalEndPoint = localEP;
@@ -35,6 +36,9 @@ namespace UdpAsTcp
         public UdpAsTcpListener(IPAddress ipAddress, int port) : this(new IPEndPoint(ipAddress, port)) { }
 
         public UdpAsTcpListener(int port) : this(IPAddress.Any, port) { }
+
+        public event EventHandler<UdpAsTcpConnectionInfo> ClientConnected;
+        public event EventHandler<UdpAsTcpConnectionInfo> ClientDisconnected;
 
         public void Start()
         {
@@ -66,15 +70,32 @@ namespace UdpAsTcp
                     {
                         try
                         {
+                            if (Debug)
+                                Console.WriteLine($"[{remoteEP}] Begin Syn and ack");
+
                             client = new UdpAsTcpClient(this, listener, remoteEP);
+                            client.Debug = Debug;
                             client.HandleBuffer(buffer);
                             clientDict.TryAdd(remoteEP, client);
                             client.serverSynAndAck();
+                            if (Debug)
+                                Console.WriteLine($"[{remoteEP}] Syn and ack done.");
                             newClientQueue.Enqueue(client);
+                            ClientConnected?.Invoke(this, new UdpAsTcpConnectionInfo()
+                            {
+                                RemoteIPEndPoint = remoteEP,
+                                Client = client
+                            });
                         }
-                        catch
+                        catch (Exception ex)
                         {
-                            clientDict.TryRemove(remoteEP, out _);
+                            client.OnError(ex);
+                            if (Debug)
+                                Console.WriteLine($"[{remoteEP}] Syn and ack error.");
+                            Task.Delay(1000).ContinueWith(t =>
+                            {
+                                clientDict.TryRemove(remoteEP, out _);
+                            });                            
                         }
                     });
                 }
@@ -122,11 +143,17 @@ namespace UdpAsTcp
             }
         }
 
-        internal void OnClientDisconnected(UdpAsTcpClient udpAsTcpClient)
+        internal void OnClientDisconnected(UdpAsTcpClient udpAsTcpClient, Exception ex)
         {
-            var key = udpAsTcpClient.RemoteEndPoint;
-            while (clientDict.ContainsKey(key))
-                clientDict.TryRemove(key, out _);
+            var remoteEP = udpAsTcpClient.RemoteEndPoint;
+            while (clientDict.ContainsKey(remoteEP))
+                clientDict.TryRemove(remoteEP, out _);
+            ClientDisconnected?.Invoke(this, new UdpAsTcpConnectionInfo()
+            {
+                RemoteIPEndPoint = remoteEP,
+                Client = udpAsTcpClient,
+                Exception = ex
+            });
         }
     }
 }
